@@ -3,7 +3,7 @@ from transformers import pipeline
 from html import escape
 
 st.set_page_config(page_title="おじさん構文ジェネレーター", page_icon="📱", layout="centered")
-st.title("📱 おじさん構文ジェネレーター")
+st.markdown('<h1 style="color:#000000; margin: 0;">📱 おじさん構文ジェネレーター</h1>', unsafe_allow_html=True)
 st.write("入力した文章を“おじさん構文”に変換します。")
 
 # ===============================
@@ -32,7 +32,11 @@ st.markdown("""
   --right:#c6f5a9;
   --border:#d1d5db;
 }
-.stApp{ background: var(--bg); }
+/* デフォルト文字色を黒に設定 */
+body, .stApp, .block-container {
+  color: #000000;
+}
+.stApp{ background: var(--bg); color: #000000; }
 .block-container{ max-width:820px; padding-top:4rem; padding-bottom:2.5rem; }
 
 .chat-wrap{
@@ -49,7 +53,7 @@ st.markdown("""
   padding:0 14px;
   background:#e6f4ff;
   border-bottom:1px solid var(--border);
-  font-weight:600; color:#111827;
+  font-weight:600; color:#000000; /* 黒に変更 */
 }
 .chat-body{
   height:420px;
@@ -126,7 +130,7 @@ with st.container():
     col1, col2 = st.columns([5,1])
     with col1:
         st.session_state["input_text"] = st.text_input(
-            label="",
+            label="入力",  # 空ラベルを避けてアクセシビリティ警告を解消
             value=st.session_state["input_text"],
             placeholder="テキストを入力してください．．．",
             label_visibility="collapsed"
@@ -150,7 +154,7 @@ if send_clicked:
                 temperature=0.8
             )[0]['generated_text']
 
-            converted = result.split("変換文：")[-1].strip()
+            converted = result.split("おじさん構文：")[-1].strip()
             st.session_state["ojisan_text"] = converted
 
         st.rerun()   # ← 即更新
