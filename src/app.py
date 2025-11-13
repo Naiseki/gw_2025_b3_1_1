@@ -1,10 +1,50 @@
 import streamlit as st
 from transformers import pipeline
 from html import escape
+import base64
+
+def get_base64_of_image(path):
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+img_base64 = get_base64_of_image("src/background.png")
+
+st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-image: url("data:image/png;base64,{img_base64}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }}
+     .title-section {{
+     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+     padding: 20px;
+     border-radius: 10px;
+     color: white;
+     margin-bottom: 20px;
+    }}
+    .title-section h1 {{
+        margin: 0;
+        font-size: 28px;
+    }}
+    .title-section p {{
+        margin: 5px 0 0 0;
+        font-size: 14px;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 st.set_page_config(page_title="おじさん構文ジェネレーター", page_icon="📱", layout="centered")
-st.title("📱 おじさん構文ジェネレーター")
-st.write("入力した文章を「おじさん構文」に変換します。")
+st.markdown("""
+    <div class="title-section">
+        <h1>📱 おじさん構文ジェネレーター</h1>
+        <p>入力した文章を「おじさん構文」に変換します。</p>
+    </div>
+""", unsafe_allow_html=True)
 
 # ===============================
 # モデルロード（変更なし）
@@ -32,7 +72,6 @@ st.markdown("""
   --right:#c6f5a9;
   --border:#d1d5db;
 }
-.stApp{ background: var(--bg); }
 .block-container{ max-width:820px; padding-top:4rem; padding-bottom:2.5rem; }
 
 .chat-wrap{
@@ -95,7 +134,7 @@ with st.container():
     # ------------------------------
     # チャット部分の描画（履歴を全表示）
     # ------------------------------
-    chat_html = '<div class="chat-wrap"><div class="chat-header"><div>＜おじさん＞</div></div><div class="chat-body">'
+    chat_html = '<div class="chat-wrap"><div class="chat-header"><div>＜おじさん</div></div><div class="chat-body">'
     
     for msg_type, msg_text in st.session_state["chat_history"]:
         if msg_type == "user":
