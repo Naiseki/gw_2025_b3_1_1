@@ -4,7 +4,7 @@ from html import escape
 
 st.set_page_config(page_title="おじさん構文ジェネレーター", page_icon="📱", layout="centered")
 st.title("📱 おじさん構文ジェネレーター")
-st.write("入力した文章を“おじさん構文”に変換します。")
+st.write("入力した文章を「おじさん構文」に変換します。")
 
 # ===============================
 # モデルロード（変更なし）
@@ -20,8 +20,8 @@ generator = load_model()
 # ===============================
 if "input_text" not in st.session_state:
     st.session_state["input_text"] = ""
-if "ojisan_text" not in st.session_state:
-    st.session_state["ojisan_text"] = None
+if "chat_history" not in st.session_state:
+    st.session_state["chat_history"] = []  # ← 履歴を保存するリスト
 
 # ---- LINE風デザイン ----
 st.markdown("""
@@ -93,32 +93,19 @@ st.markdown("""
 with st.container():
 
     # ------------------------------
-    # チャット部分の描画
+    # チャット部分の描画（履歴を全表示）
     # ------------------------------
-    ojisan = st.session_state["ojisan_text"]
-    user_text = st.session_state["input_text"]
-
-    user_bubble = (
-        f'<div class="msg-row msg-right"><div class="bubble right">{escape(user_text).replace("\\n", "<br>")}</div></div>'
-        if user_text else ""
-    )
-
-    ojisan_bubble = (
-        f'<div class="msg-row msg-left"><div class="bubble left">{escape(ojisan).replace("\\n", "<br>")}</div></div>'
-        if ojisan else ""
-    )
-
-    st.markdown(f"""
-    <div class="chat-wrap">
-      <div class="chat-header">
-        <div>＜おじさん＞</div>
-      </div>
-      <div class="chat-body">
-        {user_bubble}
-        {ojisan_bubble}
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+    chat_html = '<div class="chat-wrap"><div class="chat-header"><div>＜おじさん＞</div></div><div class="chat-body">'
+    
+    for msg_type, msg_text in st.session_state["chat_history"]:
+        if msg_type == "user":
+            chat_html += f'<div class="msg-row msg-right"><div class="bubble right">{escape(msg_text).replace(chr(10), "<br>")}</div></div>'
+        else:  # ojisan
+            chat_html += f'<div class="msg-row msg-left"><div class="bubble left">{escape(msg_text).replace(chr(10), "<br>")}</div></div>'
+    
+    chat_html += '</div></div>'
+    
+    st.markdown(chat_html, unsafe_allow_html=True)
 
     # ------------------------------
     # 下の入力欄（本物の st.text_input）
@@ -134,14 +121,17 @@ with st.container():
     with col2:
         send_clicked = st.button("送信")
 
-# ====== ボタンクリック時の処理（生成部分はそのまま） ======
+# ====== ボタンクリック時の処理 ======
 if send_clicked:
     text = st.session_state["input_text"]
-    st.session_state["ojisan_text"] = None
     
     if text.strip():
+        # ユーザーメッセージを履歴に追加
+        st.session_state["chat_history"].append(("user", text))
+        st.session_state["input_text"] = ""
+        
         with st.spinner("おじさんっぽく変換中...💦"):
-            prompt = f"次の文を、絵文字や語尾を多めに使った“おじさん構文”にしてください。出力するのは入力文をおじさん構文に変換したものだけで，それ以外の説明などは含めないこと．\n\n文：{text}\n\nおじさん構文："
+            prompt = f"次の文を、絵文字や語尾を多めに使った「おじさん構文」にしてください。出力するのは入力文をおじさん構文に変換したものだけで，それ以外の説明などは含めないこと．\n\n文：{text}\n\nおじさん構文："
             result = generator(
                 prompt,
                 max_length=150,
@@ -150,7 +140,8 @@ if send_clicked:
                 temperature=0.8
             )[0]['generated_text']
 
-            converted = result.split("変換文：")[-1].strip()
-            st.session_state["ojisan_text"] = converted
+            converted = result.split("おじさん構文：")[-1].strip()
+            # おじさんの返信を履歴に追加
+            st.session_state["chat_history"].append(("ojisan", converted))
 
-        st.rerun()   # ← 即更新
+        st.rerun()
