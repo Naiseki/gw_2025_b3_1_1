@@ -1,13 +1,17 @@
 # app.py
 import streamlit as st
 from transformers import pipeline
+import torch
 
 st.title("📱 おじさん構文ジェネレーター")
 st.write("入力した文章を“おじさん構文”に変換します。")
 
 @st.cache_resource
 def load_model():
-    return pipeline("text-generation", model="Qwen/Qwen3-4B-Instruct-2507")
+    print(f'Torch version: {torch.__version__}')
+    print(f'CUDA available: {torch.cuda.is_available()}')
+    model_name = "tokyotech-llm/Swallow-7b-hf"
+    return pipeline("text-generation", model=model_name, trust_remote_code=True, device_map="auto", use_fast=False)
 
 generator = load_model()
 
