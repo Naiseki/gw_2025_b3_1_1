@@ -2,6 +2,7 @@ import streamlit as st
 from transformers import pipeline
 from html import escape
 import base64
+from datetime import datetime
 
 def get_base64_of_image(path):
     with open(path, "rb") as f:
@@ -125,6 +126,55 @@ st.markdown("""
   border-width:6px; border-style:solid;
   border-color:transparent transparent transparent var(--right);
 }
+/* ========== メッセージ行全体をバブル下に揃える ========== */
+.msg-row{
+  display:flex;
+  align-items:flex-end;
+  margin:8px 0;
+}
+
+/* ========== バブル ========== */
+.bubble{
+  max-width:72%;
+  padding:10px 12px;
+  font-size:15px;
+  line-height:1.5;
+  border-radius:14px;
+  word-break:break-word;
+  position:relative;
+}
+
+/* ========== 既読 + 時刻（縦並び） ========== */
+.msg-info{
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-end;
+  font-size:11px;
+  line-height:1.1;
+  color:#4b5563;
+  margin-left:6px;
+  margin-right:6px;
+  min-height:20px;
+}
+
+/* 右側 */
+.msg-right .msg-info{
+  align-items:flex-end;
+}
+
+/* 左側 */
+.msg-left .msg-info{
+  align-items:flex-start;
+}
+
+/* 既読 */
+.read-status{
+  color:#6b7280;
+  font-size:10px;
+}
+
+/* ===== 追加ここまで ===== */
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -136,11 +186,16 @@ with st.container():
     # ------------------------------
     chat_html = '<div class="chat-wrap"><div class="chat-header"><div>＜おじさん</div></div><div class="chat-body">'
     
-    for msg_type, msg_text in st.session_state["chat_history"]:
+    for idx, (msg_type, msg_text) in enumerate(st.session_state["chat_history"]):
+        time_str = datetime.now().strftime("%H:%M")
+        
         if msg_type == "user":
-            chat_html += f'<div class="msg-row msg-right"><div class="bubble right">{escape(msg_text).replace(chr(10), "<br>")}</div></div>'
+            # 右側（ユーザー）：時間と既読表示
+            read_html = '<span class="read-status">既読</span>'
+            chat_html += f'<div class="msg-row msg-right"><div class="msg-info">{read_html}<div>{time_str}</div></div><div class="bubble right">{escape(msg_text).replace(chr(10), "<br>")}</div></div>'
         else:  # ojisan
-            chat_html += f'<div class="msg-row msg-left"><div class="bubble left">{escape(msg_text).replace(chr(10), "<br>")}</div></div>'
+            # 左側（おじさん）：時間のみ
+            chat_html += f'<div class="msg-row msg-left"><div class="bubble left">{escape(msg_text).replace(chr(10), "<br>")}</div><div class="msg-info">{time_str}</div></div>'
     
     chat_html += '</div></div>'
     
