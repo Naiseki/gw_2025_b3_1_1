@@ -255,40 +255,45 @@ with st.container():
 
     chat_html += "</div></div>"
     st.markdown(chat_html, unsafe_allow_html=True)
-   
-    with st.form(key="input_form"): 
-         # 入力欄＋送信ボタン
-         col1, col2 = st.columns([5, 1])
-         with col1:
-             st.session_state["input_text"] = st.text_input(
-                 label="",
-                 value=st.session_state["input_text"],
-                 placeholder="テキストを入力してください．．．",
-                 label_visibility="collapsed",
-             )
-         with col2:
-             send_clicked = st.form_submit_button("送信")
+
+    # ↓↓↓ ここを書き直し ↓↓↓
+    with st.form(key="input_form"):
+        # 入力欄＋送信ボタン
+        col1, col2 = st.columns([5, 1])
+        with col1:
+            text = st.text_input(
+                label="",
+                placeholder="テキストを入力してください．．．",
+                label_visibility="collapsed",
+                key="input_text",  # 入力欄専用にする
+            )
+        with col2:
+            send_clicked = st.form_submit_button("送信")
+    # ↑↑↑ ここまでフォーム部分 ↑↑↑
 
 
 # ===============================
 # 送信ボタンクリック時の処理
 # ===============================
 if send_clicked:
+    # フォーム送信時点の最新の値
     text = st.session_state["input_text"]
     time_str = datetime.now().strftime("%H:%M")
-    
+
     if text.strip():
         # ユーザーのメッセージを追加
         st.session_state["chat_history"].append(("user", text, time_str))
-        st.session_state["input_text"] = ""
+        # 入力欄だけ空に戻す（保存は chat_history が担当）
+        st.session_state.pop("input_text", None)
 
         with st.spinner("おじさんっぽく変換中...💦"):
             prompt = (
-                "次の文を，絵文字や語尾を多めに使った「おじさん構文」にしてください．"
-                "出力するのは入力文をおじさん構文に変換したものだけで，"
-                "それ以外の説明などは含めないこと．\n\n"
-                f"文：{text}\n\nおじさん構文："
+            "次の文を，絵文字や語尾を多めに使った「おじさん構文」にしてください．"
+            "出力するのは入力文をおじさん構文に変換したものだけで，"
+            "それ以外の説明などは含めないこと．\n\n"
+            f"文：{text}\n\nおじさん構文："
             )
+
 
             result = generator(
                 prompt,
