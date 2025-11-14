@@ -1,8 +1,10 @@
 import streamlit as st
-from transformers import pipeline
+from transformers import pipeline, AutoTokenizer
 from html import escape
 import base64
 from datetime import datetime
+import os
+import re
 
 
 # ===============================
@@ -205,10 +207,19 @@ st.markdown(
 # ===============================
 @st.cache_resource
 def load_model():
-    return pipeline("text-generation", model="Qwen/Qwen3-4B-Instruct-2507")
+    return pipeline("text-generation", model=model_id, device="cuda")
 
-
+os.environ["HF_TOKEN"] = ""
+model_id = "google/gemma-3-12b-it"
 generator = load_model()
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+# ChatML形式のテンプレートを直接設定
+tokenizer.chat_template = (
+    "{% for message in messages %}"
+    "{{ '<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n' }}"
+    "{% endfor %}"
+    "{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}"
+)
 
 
 # ===============================
@@ -283,22 +294,24 @@ if send_clicked:
         st.session_state["input_text"] = ""
 
         with st.spinner("おじさんっぽく変換中...💦"):
-            prompt = (
-                "次の文を，絵文字や語尾を多めに使った「おじさん構文」にしてください．"
-                "出力するのは入力文をおじさん構文に変換したものだけで，"
-                "それ以外の説明などは含めないこと．\n\n"
-                f"文：{text}\n\nおじさん構文："
-            )
-
+            messages = [
+                {"role": "system", "content": "与えられた文を「おじさん構文」に変換してください。変換するだけで会話の応答はするな。絵文字、カタカナ語、疑問形、親密さの強調など、「おじさん構文」の特徴を過剰なほど盛り込んでください。"},
+                {"role": "user", "content": text.strip()},
+            ]
+            prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
             result = generator(
                 prompt,
                 max_length=150,
                 num_return_sequences=1,
                 do_sample=True,
-                temperature=0.8,
+                temperature=0.6,
+                return_full_text=False,
             )[0]["generated_text"]
 
-            converted = result.split("おじさん構文：")[-1].strip()
+            # 不要なトークンを削除
+            pattern = r"<\|.*?\|>"
+            replacement = ""
+            converted = re.sub(pattern, replacement, result).strip()
 
             # おじさんの返信を追加
             st.session_state["chat_history"].append(("ojisan", converted, time_str))
