@@ -1,8 +1,11 @@
+import json
 import streamlit as st
 from transformers import pipeline
 from html import escape
 import base64
 from datetime import datetime
+import re
+
 
 
 # ===============================
@@ -205,7 +208,7 @@ st.markdown(
 # ===============================
 @st.cache_resource
 def load_model():
-    return pipeline("text-generation", model="Qwen/Qwen3-4B-Instruct-2507")
+    return pipeline("text-generation", model="nvidia/Qwen3-30B-A3B-FP4")
 
 
 generator = load_model()
@@ -287,12 +290,14 @@ if send_clicked:
         st.session_state.pop("input_text", None)
 
         with st.spinner("おじさんっぽく変換中...💦"):
+            # おじさん構文への変換処理
             prompt = (
             "次の文を，絵文字や語尾を多めに使った「おじさん構文」にしてください．"
             "出力するのは入力文をおじさん構文に変換したものだけで，"
             "それ以外の説明などは含めないこと．\n\n"
             f"文：{text}\n\nおじさん構文："
             )
+
 
 
             result = generator(
@@ -304,6 +309,7 @@ if send_clicked:
             )[0]["generated_text"]
 
             converted = result.split("おじさん構文：")[-1].strip()
+
 
             # おじさんの返信を追加
             st.session_state["chat_history"].append(("ojisan", converted, time_str))
