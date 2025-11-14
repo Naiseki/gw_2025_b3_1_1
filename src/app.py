@@ -1,6 +1,6 @@
 import json
 import streamlit as st
-from transformers import pipeline
+from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 from html import escape
 import base64
 from datetime import datetime
@@ -203,15 +203,30 @@ st.markdown(
 )
 
 
+
 # ===============================
 # モデルロード
 # ===============================
 @st.cache_resource
 def load_model():
-    return pipeline("text-generation", model="nvidia/Qwen3-30B-A3B-FP4")
+    model_name = "Qwen/Qwen3-8B"
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        torch_dtype="auto",   # ここは省略してもOK（環境に合わせて）
+        device_map="auto",    # GPU使うなら付けても良い
+    )
+
+    text_gen = pipeline(
+        "text-generation",
+        model=model,
+        tokenizer=tokenizer,
+    )
+    return text_gen, tokenizer
 
 
-generator = load_model()
+generator, tokenizer = load_model()
 
 
 # ===============================
@@ -274,7 +289,6 @@ with st.container():
             send_clicked = st.form_submit_button("送信")
     # ↑↑↑ ここまでフォーム部分 ↑↑↑
 
-
 # ===============================
 # 送信ボタンクリック時の処理
 # ===============================
@@ -290,26 +304,60 @@ if send_clicked:
         st.session_state.pop("input_text", None)
 
         with st.spinner("おじさんっぽく変換中...💦"):
-            # おじさん構文への変換処理
-            prompt = (
-            "次の文を，絵文字や語尾を多めに使った「おじさん構文」にしてください．"
-            "出力するのは入力文をおじさん構文に変換したものだけで，"
-            "それ以外の説明などは含めないこと．\n\n"
-            f"文：{text}\n\nおじさん構文："
+            # Qwen3 用の chat 形式メッセージ
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "あなたは日本語の文章を「おじさん構文」に短く言い換えるアシスタントです．\n"
+                        "ルール：\n"
+                        "・翻訳してはいけない．英語を書いてはいけない．\n"
+                        "・説明や注釈を書いてはいけない．\n"
+                        "・新しい内容を付け足してはいけない．\n"
+                        "・ユーザー文の意味を変えてはいけない．\n"
+                        "・明るく馴れ馴れしい軽いノリにする．\n"
+                        "・語尾は一部カタカナにして柔らかくする（〜ネ，〜ヨ，〜ダヨ〜など）．\n"
+                        "・文末や文中に絵文字を大量に入れる．(😊✨💕💦🥰など)\n"
+                        "・「！！」「⁉️」などの強調記号を入れてよい．\n"
+                        "・出力は変換後の文だけを 1 回だけ出力する．\n"
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": text,
+                },
+            ]
+
+            # Qwen3 の chat テンプレートを使ってプロンプトに変換
+            prompt = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False,  # ← <think> を出したくないので OFF
             )
 
-
-
-            result = generator(
+            # 「新しく生成するトークン数」で制御
+            out = generator(
                 prompt,
-                max_length=150,
-                num_return_sequences=1,
+                max_new_tokens=64,
                 do_sample=True,
                 temperature=0.8,
+                top_p=0.92,
+                repetition_penalty=1.25,
             )[0]["generated_text"]
 
-            converted = result.split("おじさん構文：")[-1].strip()
+            # プロンプト部分を削って，生成テキストだけ取り出す
+            generated = out[len(prompt):].strip()
 
+            # 念のため最初の1行だけ採用（説明しゃべりだした場合の保険）
+            converted = generated.splitlines()[0].strip()
+
+            # 句読点を「，」「．」にそろえる簡単な後処理
+            converted = (
+                converted
+                .replace("、", "，")
+                .replace("。", "．")
+            )
 
             # おじさんの返信を追加
             st.session_state["chat_history"].append(("ojisan", converted, time_str))
