@@ -1,10 +1,11 @@
+import json
 import streamlit as st
-from transformers import pipeline, AutoTokenizer
+from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 from html import escape
 import base64
 from datetime import datetime
-import os
 import re
+
 
 
 # ===============================
@@ -202,24 +203,30 @@ st.markdown(
 )
 
 
+
 # ===============================
 # モデルロード
 # ===============================
 @st.cache_resource
 def load_model():
-    return pipeline("text-generation", model=model_id, device="cuda")
+    model_name = "Qwen/Qwen3-8B"
 
-os.environ["HF_TOKEN"] = ""
-model_id = "google/gemma-3-12b-it"
-generator = load_model()
-tokenizer = AutoTokenizer.from_pretrained(model_id)
-# ChatML形式のテンプレートを直接設定
-tokenizer.chat_template = (
-    "{% for message in messages %}"
-    "{{ '<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n' }}"
-    "{% endfor %}"
-    "{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}"
-)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        torch_dtype="auto",   # ここは省略してもOK（環境に合わせて）
+        device_map="auto",    # GPU使うなら付けても良い
+    )
+
+    text_gen = pipeline(
+        "text-generation",
+        model=model,
+        tokenizer=tokenizer,
+    )
+    return text_gen, tokenizer
+
+
+generator, tokenizer = load_model()
 
 
 # ===============================
@@ -266,52 +273,96 @@ with st.container():
 
     chat_html += "</div></div>"
     st.markdown(chat_html, unsafe_allow_html=True)
-   
-    with st.form(key="input_form"): 
-         # 入力欄＋送信ボタン
-         col1, col2 = st.columns([5, 1])
-         with col1:
-             st.session_state["input_text"] = st.text_input(
-                 label="",
-                 value=st.session_state["input_text"],
-                 placeholder="テキストを入力してください．．．",
-                 label_visibility="collapsed",
-             )
-         with col2:
-             send_clicked = st.form_submit_button("送信")
 
+    # ↓↓↓ ここを書き直し ↓↓↓
+    with st.form(key="input_form"):
+        # 入力欄＋送信ボタン
+        col1, col2 = st.columns([5, 1])
+        with col1:
+            text = st.text_input(
+                label="",
+                placeholder="テキストを入力してください．．．",
+                label_visibility="collapsed",
+                key="input_text",  # 入力欄専用にする
+            )
+        with col2:
+            send_clicked = st.form_submit_button("送信")
+    # ↑↑↑ ここまでフォーム部分 ↑↑↑
 
 # ===============================
 # 送信ボタンクリック時の処理
 # ===============================
 if send_clicked:
+    # フォーム送信時点の最新の値
     text = st.session_state["input_text"]
     time_str = datetime.now().strftime("%H:%M")
-    
+
     if text.strip():
         # ユーザーのメッセージを追加
         st.session_state["chat_history"].append(("user", text, time_str))
-        st.session_state["input_text"] = ""
+        # 入力欄だけ空に戻す（保存は chat_history が担当）
+        st.session_state.pop("input_text", None)
 
         with st.spinner("おじさんっぽく変換中...💦"):
+            # Qwen3 用の chat 形式メッセージ
             messages = [
-                {"role": "system", "content": "与えられた文を「おじさん構文」に変換してください。変換するだけで会話の応答はするな。絵文字、カタカナ語、疑問形、親密さの強調など、「おじさん構文」の特徴を過剰なほど盛り込んでください。"},
-                {"role": "user", "content": text.strip()},
+                {
+                    "role": "system",
+                    "content": (
+                        "あなたは日本語の文章を「おじさん構文」に短く言い換えるアシスタントです．"
+
+                        "【厳守ルール】"
+                        "・翻訳してはいけない（日本語のみ）．"
+                        "・説明，注釈，断り書きをしてはいけない．"
+                        "・内容を追加してはいけない．"
+                        "・意味を変えてはいけない．"
+                        "・元の文量より大幅に長文化しないこと．"
+
+                        "【文体ルール】"
+                        "・<例：「おはよう！今日の予定はありますか？」→「おはよう😃今日の予定あるカナ❓️💡✨🌈💭🎉」>"
+                        "・疑問形は基本的に「〜カナ❓️」に変換する．"
+                        "・文中の名詞，動詞，形容詞，副詞の後ろにできるだけ絵文字（😊✨💕🥰😆💦😘💖🌸🍀）を挿入する．  "
+                        "（頻度は高め，1文あたり4〜10個程度を目安） "
+                        "・文末は必ず3個以上の絵文字を付ける．"
+                        "・やや明るく馴れ馴れしい軽いノリにする．"
+                        "・語尾にはカタカナ調を混ぜる（〜ネ〜✨，〜ダヨ〜💕，〜カナ😆）．"
+                        "・「！！」「⁉️」などの強調記号を入れてよい．"
+
+                        "【出力ルール】"
+                        "・出力は変換後の文だけを 1 回だけ返す．"
+                        "・余計な前置きや説明は禁止．"
+
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": text,
+                },
             ]
-            prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-            result = generator(
+
+            # Qwen3 の chat テンプレートを使ってプロンプトに変換
+            prompt = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False,  # ← <think> を出したくないので OFF
+            )
+
+            # 「新しく生成するトークン数」で制御
+            out = generator(
                 prompt,
-                max_length=150,
-                num_return_sequences=1,
+                max_new_tokens=64,
                 do_sample=True,
-                temperature=0.6,
-                return_full_text=False,
+                temperature=0.8,
+                top_p=0.92,
+                repetition_penalty=1.25,
             )[0]["generated_text"]
 
-            # 不要なトークンを削除
-            pattern = r"<\|.*?\|>"
-            replacement = ""
-            converted = re.sub(pattern, replacement, result).strip()
+            # プロンプト部分を削って，生成テキストだけ取り出す
+            generated = out[len(prompt):].strip()
+
+            # 念のため最初の1行だけ採用（説明しゃべりだした場合の保険）
+            converted = generated.splitlines()[0].strip()
 
             # おじさんの返信を追加
             st.session_state["chat_history"].append(("ojisan", converted, time_str))
