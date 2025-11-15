@@ -26,7 +26,7 @@ def get_base64_of_image(path: str) -> str:
         return base64.b64encode(f.read()).decode()
 
 
-img_base64 = get_base64_of_image("src/background.png")
+img_base64 = get_base64_of_image("img/background.png")
 
 
 # ===============================
