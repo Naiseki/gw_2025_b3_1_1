@@ -196,7 +196,7 @@ st.markdown(
     """
 <div class="title-section">
     <h1>📱 おじさん構文ジェネレータ</h1>
-    <p>入力した文章を、おじさん構文に変換しちゃうヨ😎．</p>
+    <p>入力した文章を、おじさん構文に変換しちゃうヨ😎</p>
 </div>
 """,
     unsafe_allow_html=True,
