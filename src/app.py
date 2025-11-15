@@ -243,7 +243,7 @@ if "chat_history" not in st.session_state:
 # チャットUI描画
 # ===============================
 with st.container():
-    # チャット部分（HTML組み立て）
+    # チャット部分
     chat_html = (
         '<div class="chat-wrap">'
         '<div class="chat-header"><div>＜おじさん</div></div>'
@@ -274,7 +274,7 @@ with st.container():
     chat_html += "</div></div>"
     st.markdown(chat_html, unsafe_allow_html=True)
 
-    # ↓↓↓ ここを書き直し ↓↓↓
+    # フォーム部分
     with st.form(key="input_form"):
         # 入力欄＋送信ボタン
         col1, col2 = st.columns([5, 1])
@@ -287,7 +287,6 @@ with st.container():
             )
         with col2:
             send_clicked = st.form_submit_button("送信")
-    # ↑↑↑ ここまでフォーム部分 ↑↑↑
 
 # ===============================
 # 送信ボタンクリック時の処理
@@ -300,7 +299,7 @@ if send_clicked:
     if text.strip():
         # ユーザーのメッセージを追加
         st.session_state["chat_history"].append(("user", text, time_str))
-        # 入力欄だけ空に戻す（保存は chat_history が担当）
+        # 入力欄だけ空に戻す
         st.session_state.pop("input_text", None)
 
         with st.spinner("おじさんっぽく変換中...💦"):
@@ -361,7 +360,7 @@ if send_clicked:
             # プロンプト部分を削って，生成テキストだけ取り出す
             generated = out[len(prompt):].strip()
 
-            # 念のため最初の1行だけ採用（説明しゃべりだした場合の保険）
+            # 最初の1行だけ採用（説明しゃべりだした場合の保険）
             converted = generated.splitlines()[0].strip()
 
             # おじさんの返信を追加
