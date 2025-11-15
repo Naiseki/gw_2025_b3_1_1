@@ -196,7 +196,7 @@ st.markdown(
     """
 <div class="title-section">
     <h1>📱 おじさん構文ジェネレーター</h1>
-    <p>入力した文章を「おじさん構文」に変換します．</p>
+    <p>入力した文章を、おじさん構文に変換しちゃうヨ😎．</p>
 </div>
 """,
     unsafe_allow_html=True,
@@ -214,8 +214,8 @@ def load_model():
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype="auto",   # ここは省略してもOK（環境に合わせて）
-        device_map="auto",    # GPU使うなら付けても良い
+        torch_dtype="auto",   
+        device_map="auto"   
     )
 
     text_gen = pipeline(
